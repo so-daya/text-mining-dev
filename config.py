@@ -104,5 +104,13 @@ SESSION_KEY_KWIC_WINDOW_VAL = 'kwic_window_val'
 SESSION_KEY_ANALYZED_MORPHS = 'analyzed_morphemes'
 SESSION_KEY_ANALYZED_TEXT = 'analyzed_text_input'
 
+# --- タブ関連の定数 ---
+TAB_NAME_REPORT = "📊 単語出現レポート"
+TAB_NAME_WC = "☁️ ワードクラウド"
+TAB_NAME_NETWORK = "🕸️ 共起ネットワーク"
+TAB_NAME_KWIC = "🔍 KWIC検索"
+DEFAULT_ACTIVE_TAB = TAB_NAME_REPORT # デフォルトで開くタブ
+SESSION_KEY_ACTIVE_TAB = 'active_analysis_tab' # 現在アクティブなタブを保存するキー
+
 # --- アプリケーション情報 ---
-APP_VERSION = "0.3.3" # バージョン更新
+APP_VERSION = "0.3.4" # バージョン更新
