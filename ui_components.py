@@ -4,8 +4,9 @@ import pandas as pd
 import re
 import os
 
-from config import (DEFAULT_TARGET_POS, GENERAL_STOP_WORDS, # GENERAL_STOP_WORDS をインポート
-                    SESSION_KEY_KWIC_KEYWORD, SESSION_KEY_KWIC_MODE_IDX, SESSION_KEY_KWIC_WINDOW_VAL)
+from config import (DEFAULT_TARGET_POS, GENERAL_STOP_WORDS,
+                    SESSION_KEY_KWIC_KEYWORD, SESSION_KEY_KWIC_MODE_IDX, SESSION_KEY_KWIC_WINDOW_VAL,
+                    SESSION_KEY_ACTIVE_TAB, TAB_NAME_KWIC)
 from text_analyzer import (generate_word_report, generate_wordcloud_image,
                            generate_cooccurrence_network_html, perform_kwic_search)
 
@@ -104,50 +105,68 @@ def show_network_tab(morphemes_data, text_input, tagger_dummy, font_path, font_n
 
 def show_kwic_tab(morphemes_data):
     st.subheader("KWIC検索 (文脈付きキーワード検索)")
-    
-    # セッションステートの初期化
-    if SESSION_KEY_KWIC_KEYWORD not in st.session_state: 
+
+    # --- コールバック関数の定義 ---
+    def update_kwic_keyword():
+        st.session_state[SESSION_KEY_KWIC_KEYWORD] = st.session_state.kwic_keyword_input_field_tab
+        st.session_state[SESSION_KEY_ACTIVE_TAB] = TAB_NAME_KWIC # KWICタブをアクティブにする
+
+    def update_kwic_mode():
+        kwic_search_options = ("原形一致", "表層形一致") # on_change内で再度定義が必要な場合がある
+        st.session_state[SESSION_KEY_KWIC_MODE_IDX] = kwic_search_options.index(st.session_state.kwic_mode_radio_field_tab)
+        st.session_state[SESSION_KEY_ACTIVE_TAB] = TAB_NAME_KWIC # KWICタブをアクティブにする
+
+    def update_kwic_window():
+        st.session_state[SESSION_KEY_KWIC_WINDOW_VAL] = st.session_state.kwic_window_slider_field_tab
+        st.session_state[SESSION_KEY_ACTIVE_TAB] = TAB_NAME_KWIC # KWICタブをアクティブにする
+
+    # --- セッションステートの初期化 ---
+    if SESSION_KEY_KWIC_KEYWORD not in st.session_state:
         st.session_state[SESSION_KEY_KWIC_KEYWORD] = ""
-    if SESSION_KEY_KWIC_MODE_IDX not in st.session_state: 
+    if SESSION_KEY_KWIC_MODE_IDX not in st.session_state:
         st.session_state[SESSION_KEY_KWIC_MODE_IDX] = 0 # "原形一致"
-    if SESSION_KEY_KWIC_WINDOW_VAL not in st.session_state: 
+    if SESSION_KEY_KWIC_WINDOW_VAL not in st.session_state:
         st.session_state[SESSION_KEY_KWIC_WINDOW_VAL] = 5
 
+    # --- UIウィジェット ---
     kwic_keyword = st.text_input(
-        "KWIC検索キーワード:", 
-        value=st.session_state[SESSION_KEY_KWIC_KEYWORD], 
-        placeholder="検索したい単語(原形推奨)...", 
-        key="kwic_keyword_input_field_tab",
-        on_change=lambda: setattr(st.session_state, SESSION_KEY_KWIC_KEYWORD, st.session_state.kwic_keyword_input_field_tab)
+        "KWIC検索キーワード:",
+        value=st.session_state[SESSION_KEY_KWIC_KEYWORD], # valueは表示用
+        placeholder="検索したい単語(原形推奨)...",
+        key="kwic_keyword_input_field_tab", # コールバック内で参照するキー
+        on_change=update_kwic_keyword # コールバック関数を指定
     )
 
-    kwic_search_options = ("原形一致", "表層形一致")
-    kwic_search_mode = st.radio(
-        "KWIC検索モード:", kwic_search_options, 
-        index=st.session_state[SESSION_KEY_KWIC_MODE_IDX], 
-        key="kwic_mode_radio_field_tab",
-        on_change=lambda: setattr(st.session_state, SESSION_KEY_KWIC_MODE_IDX, kwic_search_options.index(st.session_state.kwic_mode_radio_field_tab))
-    )
-    
-    kwic_window = st.slider(
-        "KWIC表示文脈の形態素数 (前後各):", 1, 15, 
-        st.session_state[SESSION_KEY_KWIC_WINDOW_VAL], 
-        key="kwic_window_slider_field_tab",
-        on_change=lambda: setattr(st.session_state, SESSION_KEY_KWIC_WINDOW_VAL, st.session_state.kwic_window_slider_field_tab)
+    kwic_search_options_list = ("原形一致", "表層形一致")
+    kwic_search_mode_selected_val = st.radio(
+        "KWIC検索モード:", kwic_search_options_list,
+        index=st.session_state[SESSION_KEY_KWIC_MODE_IDX],
+        key="kwic_mode_radio_field_tab", # コールバック内で参照するキー
+        on_change=update_kwic_mode, # コールバック関数を指定
+        horizontal=True # 横並びで見やすく
     )
 
-    if kwic_keyword.strip():
-        search_key_type = '原形' if kwic_search_mode == "原形一致" else '表層形'
-        
-        with st.spinner(f"「{kwic_keyword.strip()}」を検索中..."):
-            kwic_results = perform_kwic_search(
-                tuple(morphemes_data), kwic_keyword.strip(), search_key_type, kwic_window
+    kwic_window_val_set = st.slider(
+        "KWIC表示文脈の形態素数 (前後各):", 1, 15,
+        st.session_state[SESSION_KEY_KWIC_WINDOW_VAL],
+        key="kwic_window_slider_field_tab", # コールバック内で参照するキー
+        on_change=update_kwic_window # コールバック関数を指定
+    )
+
+    # --- 検索実行と結果表示 ---
+    # kwic_keyword は st.text_input の返り値なので、現在の入力フィールドの値を直接反映
+    # st.session_state[SESSION_KEY_KWIC_KEYWORD] は on_change 後に更新される
+    if kwic_keyword.strip(): # 現在の入力フィールドの値で判定
+        search_key_type_for_kwic_val = '原形' if st.session_state[SESSION_KEY_KWIC_MODE_IDX] == 0 else '表層形'
+        kw_to_search = kwic_keyword.strip()
+
+        with st.spinner(f"「{kw_to_search}」を検索中..."):
+            results_kwic_list_data = perform_kwic_search(
+                tuple(morphemes_data), kw_to_search, search_key_type_for_kwic_val, st.session_state[SESSION_KEY_KWIC_WINDOW_VAL]
             )
-        if kwic_results:
-            st.write(f"「{kwic_keyword.strip()}」の検索結果 ({len(kwic_results)}件):")
-            df_kwic = pd.DataFrame(kwic_results)
-            st.dataframe(df_kwic)
+        if results_kwic_list_data:
+            st.write(f"「{kw_to_search}」の検索結果 ({len(results_kwic_list_data)}件):")
+            df_kwic_to_display_final = pd.DataFrame(results_kwic_list_data)
+            st.dataframe(df_kwic_to_display_final)
         else:
-            st.info(f"「{kwic_keyword.strip()}」は見つかりませんでした（現在の検索モードにおいて）。")
-    # else:
-    #     st.caption("キーワードを入力して検索してください。") # 必要ならコメントアウト解除
+            st.info(f"「{kw_to_search}」は見つかりませんでした（現在の検索モードにおいて）。")
