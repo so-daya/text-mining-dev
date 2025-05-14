@@ -16,7 +16,7 @@ import html # ★XSS対策のためhtmlモジュールをインポート
 
 from config import TAGGER_OPTIONS, FONT_PATH_PRIMARY, PYVIS_OPTIONS_STR
 
-@st.cache_resource
+# @st.cache_resource
 def initialize_mecab_tagger():
     """MeCab.Taggerを初期化して返す。結果はキャッシュされる。"""
     try:
