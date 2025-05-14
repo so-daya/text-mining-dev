@@ -139,64 +139,44 @@ if st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is not None:
     morphemes_to_display = st.session_state[SESSION_KEY_ANALYZED_MORPHS]
     analyzed_text_for_network = st.session_state[SESSION_KEY_ANALYZED_TEXT]
 
-    tab_names = [TAB_NAME_REPORT, TAB_NAME_WC, TAB_NAME_NETWORK, TAB_NAME_KWIC]
-    
-    # --- st.radio の index パラメータを設定するための準備 ---
-    # 現在のセッションステートに保存されているアクティブタブに基づいてインデックスを決定
-    # 初回や不正な値の場合はデフォルトタブにする
-    active_tab_in_session_for_index = st.session_state.get(SESSION_KEY_ACTIVE_TAB, DEFAULT_ACTIVE_TAB)
-    if active_tab_in_session_for_index not in tab_names:
-        # st.warning(f"セッションのタブ名 '{active_tab_in_session_for_index}' が不正のため、デフォルト '{DEFAULT_ACTIVE_TAB}' にします。")
-        active_tab_in_session_for_index = DEFAULT_ACTIVE_TAB
-        st.session_state[SESSION_KEY_ACTIVE_TAB] = active_tab_in_session_for_index # 不正な値を修正
-    current_tab_index = tab_names.index(active_tab_in_session_for_index)
+    tab_names_map = {
+        TAB_NAME_REPORT: "btn_report_tab",
+        TAB_NAME_WC: "btn_wc_tab",
+        TAB_NAME_NETWORK: "btn_network_tab",
+        TAB_NAME_KWIC: "btn_kwic_tab"
+    }
+    tab_keys = list(tab_names_map.keys())
 
-    # --- st.radio でタブ選択UIを作成 (key パラメータを削除) ---
-    # 返り値でユーザーが選択したタブ名を取得する
-    selected_tab_name = st.radio(
-        "分析結果表示:",
-        options=tab_names,
-        index=current_tab_index, # 初期表示および状態復元のためのインデックス
-        # key=SESSION_KEY_ACTIVE_TAB, # key パラメータを削除
-        horizontal=True
-        # on_change コールバックも削除 (keyがない場合はあまり意味がない)
-    )
+    # --- ボタンベースのタブ選択 UI ---
+    cols = st.columns(len(tab_keys))
+    for i, tab_name_key in enumerate(tab_keys):
+        # ボタンのタイプを、現在アクティブなタブであれば "primary" に、そうでなければ "secondary" (デフォルト) にする
+        button_type = "primary" if st.session_state.get(SESSION_KEY_ACTIVE_TAB) == tab_name_key else "secondary"
+        if cols[i].button(tab_name_key, use_container_width=True, key=tab_names_map[tab_name_key], type=button_type):
+            st.session_state[SESSION_KEY_ACTIVE_TAB] = tab_name_key
+            # ボタンクリックで即座に表示を更新するために st.rerun() を呼ぶ
+            # これにより、選択されたボタンがすぐにプライマリ表示になる
+            st.rerun() 
 
-    # --- ラジオボタンの現在の選択をセッションステートに「手動で」保存 ---
-    # これにより、次の再実行時に current_tab_index が正しく計算されることを期待
-    if st.session_state.get(SESSION_KEY_ACTIVE_TAB) != selected_tab_name:
-        st.session_state[SESSION_KEY_ACTIVE_TAB] = selected_tab_name
-        # ★重要: セッションステートを変更した後は、表示を正しく更新するために再実行を促す
-        # ただし、この位置で st.rerun() を呼ぶと無限ループになる可能性があるため、
-        # Streamlitがウィジェットの値変更を検知して自動で再実行するのに任せる。
-        # この代入は、次の再実行サイクルで active_tab_in_session_for_index に反映される。
-
-    # --- デバッグ情報表示 ---
-    st.write("--- タブ選択デバッグ情報 (keyなし、手動更新) ---")
-    st.write(f"st.radioから返された値 (selected_tab_name): `{selected_tab_name}`")
-    active_in_session_after_manual_update = st.session_state.get(SESSION_KEY_ACTIVE_TAB)
-    st.write(f"手動更新後のセッションステートの値 (st.session_state['{SESSION_KEY_ACTIVE_TAB}']): `{active_in_session_after_manual_update}`")
-    st.write("--- デバッグ情報ここまで ---")
+    # --- デバッグ情報表示 (簡略化) ---
+    # st.write("--- タブ選択デバッグ情報 (Button based) ---")
+    # active_in_session = st.session_state.get(SESSION_KEY_ACTIVE_TAB)
+    # st.write(f"現在のセッションステート (st.session_state['{SESSION_KEY_ACTIVE_TAB}']): `{active_in_session}`")
+    # st.write("--- デバッグ情報ここまで ---")
     
     # --- 選択されたタブに応じて内容を表示 ---
-    # 条件分岐には、更新されたセッションステートの値を使用
-    active_tab_to_render = st.session_state[SESSION_KEY_ACTIVE_TAB] 
-    # st.write(f"Debug: 条件分岐に使用する active_tab_to_render: `{active_tab_to_render}`")
-
+    active_tab_to_render = st.session_state.get(SESSION_KEY_ACTIVE_TAB, DEFAULT_ACTIVE_TAB) 
 
     if active_tab_to_render == TAB_NAME_REPORT:
-        # st.write(f"Debug: 「{TAB_NAME_REPORT}」の条件に一致しました。描画します。")
         show_report_tab(morphemes_to_display,
                         analysis_options["report_pos"],
                         analysis_options["stop_words"])
     elif active_tab_to_render == TAB_NAME_WC:
-        # st.write(f"Debug: 「{TAB_NAME_WC}」の条件に一致しました。描画します。")
         show_wordcloud_tab(morphemes_to_display,
                            font_path,
                            analysis_options["wc_pos"],
                            analysis_options["stop_words"])
     elif active_tab_to_render == TAB_NAME_NETWORK:
-        # st.write(f"Debug: 「{TAB_NAME_NETWORK}」の条件に一致しました。描画します。")
         show_network_tab(morphemes_to_display,
                          analyzed_text_for_network,
                          TAGGER_OPTIONS,
@@ -206,10 +186,9 @@ if st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is not None:
                          analysis_options["node_min_freq"],
                          analysis_options["edge_min_freq"])
     elif active_tab_to_render == TAB_NAME_KWIC:
-        # st.write(f"Debug: 「{TAB_NAME_KWIC}」の条件に一致しました。描画します。")
         show_kwic_tab(morphemes_to_display)
-    else:
-        st.warning(f"不明なタブが選択されています: {active_tab_to_render}")
+    # else ブロックは、DEFAULT_ACTIVE_TAB が必ず tab_names に含まれるため、通常不要
+
 else:
     st.info("分析したいテキストを入力し、「分析実行」ボタンを押してください。")
 
