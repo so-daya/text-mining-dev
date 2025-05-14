@@ -9,7 +9,7 @@ st.set_page_config(layout="wide", page_title="テキストマイニングツー�
 from config import (APP_VERSION, SESSION_KEY_MECAB_INIT, TAGGER_OPTIONS,
                     SESSION_KEY_ANALYZED_MORPHS, SESSION_KEY_ANALYZED_TEXT,
                     TAB_NAME_REPORT, TAB_NAME_WC, TAB_NAME_NETWORK, TAB_NAME_KWIC,
-                    DEFAULT_ACTIVE_TAB, SESSION_KEY_ACTIVE_TAB) # SESSION_KEY_ACTIVE_TAB もインポートリストに含めます
+                    DEFAULT_ACTIVE_TAB, SESSION_KEY_ACTIVE_TAB)
 from text_analyzer import initialize_mecab_tagger, setup_japanese_font, perform_morphological_analysis
 from ui_components import show_sidebar_options, show_report_tab, show_wordcloud_tab, show_network_tab, show_kwic_tab
 
@@ -92,7 +92,9 @@ if SESSION_KEY_ANALYZED_MORPHS not in st.session_state:
     st.session_state[SESSION_KEY_ANALYZED_MORPHS] = None
 if SESSION_KEY_ANALYZED_TEXT not in st.session_state:
     st.session_state[SESSION_KEY_ANALYZED_TEXT] = ""
-# SESSION_KEY_ACTIVE_TAB の初期化は、後続のテストコードで行うため、ここでは不要（またはテストに合わせて調整）
+if SESSION_KEY_ACTIVE_TAB not in st.session_state: # 新しいキー名で初期化
+    st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB
+
 
 # --- UI メイン部分 ---
 st.title("テキストマイニングツール (Streamlit版)")
@@ -127,10 +129,7 @@ if analyze_button:
                 st.success(f"形態素解析が完了しました。総形態素数: {len(morphemes_result)}")
                 st.session_state[SESSION_KEY_ANALYZED_MORPHS] = morphemes_result
                 st.session_state[SESSION_KEY_ANALYZED_TEXT] = text_to_analyze
-                # 分析実行後は、テストのためシンプルラジオボタンの選択をデフォルトに戻す（任意）
-                if 'simple_radio_key_test' in st.session_state: # テスト用のキーが存在すれば
-                    st.session_state.simple_radio_key_test = TAB_NAME_REPORT
-
+                st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB
 
 # --- 分析結果の表示エリア ---
 if st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is not None:
@@ -138,57 +137,61 @@ if st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is not None:
 
     morphemes_to_display = st.session_state[SESSION_KEY_ANALYZED_MORPHS]
     analyzed_text_for_network = st.session_state[SESSION_KEY_ANALYZED_TEXT]
+
     tab_names = [TAB_NAME_REPORT, TAB_NAME_WC, TAB_NAME_NETWORK, TAB_NAME_KWIC]
-
-    # --- ↓↓↓ ここからシンプルなラジオボタンのテスト ↓↓↓ ---
-    st.subheader("【テスト】シンプルなラジオボタンの動作確認")
     
-    # このテスト用のセッションステートキーを初期化
-    if 'simple_radio_key_test' not in st.session_state:
-        st.session_state.simple_radio_key_test = TAB_NAME_REPORT # 初期値はレポートタブ
+    # セッションステートに保存されたアクティブタブ名に基づいて、st.radio の初期選択インデックスを決定
+    # この時点で SESSION_KEY_ACTIVE_TAB には、ユーザーが前回選択したタブ名（またはデフォルト）が入っているはず
+    try:
+        # セッションステートの値が不正な場合のフォールバック
+        if st.session_state.get(SESSION_KEY_ACTIVE_TAB) not in tab_names:
+            st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB
+        current_tab_index = tab_names.index(st.session_state[SESSION_KEY_ACTIVE_TAB])
+    except Exception: # 何らかの予期せぬエラーでインデックスが見つからない場合
+        current_tab_index = tab_names.index(DEFAULT_ACTIVE_TAB)
+        st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB
 
-    selected_simple_tab = st.radio(
-        "テスト用タブ選択:",
-        options=tab_names, # 同じタブ名のリストを使用
-        key='simple_radio_key_test', # 他と衝突しない新しいキー名
+    # st.radio でタブ選択UIを作成。key を使ってセッションステートと同期
+    selected_tab_name = st.radio(
+        "分析結果表示:",
+        options=tab_names,
+        index=current_tab_index,  # 初期表示時の選択
+        key=SESSION_KEY_ACTIVE_TAB, # このキーでセッションステートの値が更新・復元される
         horizontal=True
     )
 
-    st.write("--- テスト用ラジオボタンのデバッグ情報 ---")
-    st.write(f"テスト用ラジオボタンの現在の選択 (selected_simple_tab): `{selected_simple_tab}`")
-    st.write(f"テスト用セッションステート (st.session_state.simple_radio_key_test): `{st.session_state.simple_radio_key_test}`")
-    st.write("--- テスト用デバッグ情報ここまで ---")
-    
-    st.markdown("---") # テスト部分との区切り
-    # --- ↑↑↑ シンプルなラジオボタンのテストここまで ↑↑↑ ---
-
-
-    # --- 元のタブ表示ロジック (一時的にコメントアウト、またはこのテストの下に配置して動作確認) ---
-    # st.write("--- 本番タブ選択デバッグ情報 (After radio) ---")
-    # st.write(f"st.radioから返された選択タブ (selected_tab_name_from_radio): `{st.session_state.get(SESSION_KEY_ACTIVE_TAB)}`") # keyの値を直接見る
+    # # デバッグ用 (必要に応じてコメント解除)
+    # st.write("--- タブ選択デバッグ情報 (After radio) ---")
+    # st.write(f"st.radioから返された選択タブ (selected_tab_name): `{selected_tab_name}`")
     # st.write(f"セッションステートの現在の選択タブ (st.session_state[SESSION_KEY_ACTIVE_TAB]): `{st.session_state.get(SESSION_KEY_ACTIVE_TAB)}`")
     # st.write("--- デバッグ情報ここまで ---")
-
-    # active_tab_to_render = st.session_state.get(SESSION_KEY_ACTIVE_TAB, DEFAULT_ACTIVE_TAB) # SESSION_KEY_ACTIVE_TAB を使用
-
-    # if active_tab_to_render == TAB_NAME_REPORT:
-    #     show_report_tab(...)
-    # elif active_tab_to_render == TAB_NAME_WC:
-    #     show_wordcloud_tab(...)
-    # elif active_tab_to_render == TAB_NAME_NETWORK:
-    #     show_network_tab(...)
-    # elif active_tab_to_render == TAB_NAME_KWIC:
-    #     show_kwic_tab(...)
-    # else:
-    #     st.warning(f"不明なタブが選択されています: {active_tab_to_render}")
     
-    # 今回はまず上記のテストラジオボタンの動作を確認するため、元のタブ内容は表示しないようにします。
-    # もしテストラジオボタンが正しく動作すれば、そのキー (simple_radio_key_test) を使って
-    # 以下のタブ内容表示ロジックを動かすように変更します。
-    st.markdown(f"**（現在選択されているテストタブ: {st.session_state.simple_radio_key_test}）**")
-    st.markdown("（ここに、選択されたテストタブに応じた内容が表示される予定です）")
+    # 選択されたタブ (セッションステートの値) に応じて内容を表示
+    active_tab_to_render = st.session_state[SESSION_KEY_ACTIVE_TAB] 
 
-
+    if active_tab_to_render == TAB_NAME_REPORT:
+        show_report_tab(morphemes_to_display,
+                        analysis_options["report_pos"],
+                        analysis_options["stop_words"])
+    elif active_tab_to_render == TAB_NAME_WC:
+        show_wordcloud_tab(morphemes_to_display,
+                           font_path,
+                           analysis_options["wc_pos"],
+                           analysis_options["stop_words"])
+    elif active_tab_to_render == TAB_NAME_NETWORK:
+        show_network_tab(morphemes_to_display,
+                         analyzed_text_for_network,
+                         TAGGER_OPTIONS,
+                         font_path, font_name,
+                         analysis_options["net_pos"],
+                         analysis_options["stop_words"],
+                         analysis_options["node_min_freq"],
+                         analysis_options["edge_min_freq"])
+    elif active_tab_to_render == TAB_NAME_KWIC:
+        show_kwic_tab(morphemes_to_display)
+    else:
+        # このケースは通常発生しないはず
+        st.warning(f"不明なタブが選択されています: {active_tab_to_render}")
 else:
     st.info("分析したいテキストを入力し、「分析実行」ボタンを押してください。")
 
