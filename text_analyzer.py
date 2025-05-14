@@ -170,9 +170,16 @@ def generate_wordcloud_image(_morphemes_data_tuple, font_path_wc, target_pos_lis
         return None
     
     try:
-        wc = WordCloud(font_path=font_path_wc, background_color="white", 
-                       width=800, height=400, max_words=200, 
-                       collocations=False, random_state=42).generate(wordcloud_text_input_str)
+        wc = WordCloud(font_path=font_path_wc, 
+                       background_color="white", 
+                       width=800, 
+                       height=400, 
+                       max_words=200, 
+                       collocations=False,  # 複合語を避ける設定 (既存)
+                       random_state=42,     # レイアウトの再現性のため (既存)
+                       colormap='viridis',  # ★カラーマップを追加
+                       min_font_size=10      # ★最小フォントサイズを追加 (この値は調整可能です)
+                       ).generate(wordcloud_text_input_str)
         fig, ax = plt.subplots(figsize=(12,6))
         ax.imshow(wc, interpolation='bilinear')
         ax.axis("off")
