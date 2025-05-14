@@ -2,28 +2,30 @@
 import streamlit as st
 import os
 
-# ページ設定
+# ページ設定は一番最初に呼び出す
 st.set_page_config(layout="wide", page_title="テキストマイニングツール (Streamlit版)")
 
 # --- モジュールのインポート ---
 from config import (APP_VERSION, SESSION_KEY_MECAB_INIT, TAGGER_OPTIONS,
                     SESSION_KEY_ANALYZED_MORPHS, SESSION_KEY_ANALYZED_TEXT,
-                    TAB_NAME_REPORT, TAB_NAME_WC, TAB_NAME_NETWORK, TAB_NAME_KWIC, # タブ名定数をインポート
-                    DEFAULT_ACTIVE_TAB, SESSION_KEY_ACTIVE_TAB) # アクティブタブ関連の定数をインポート
+                    TAB_NAME_REPORT, TAB_NAME_WC, TAB_NAME_NETWORK, TAB_NAME_KWIC,
+                    DEFAULT_ACTIVE_TAB, SESSION_KEY_ACTIVE_TAB)
 from text_analyzer import initialize_mecab_tagger, setup_japanese_font, perform_morphological_analysis
 from ui_components import show_sidebar_options, show_report_tab, show_wordcloud_tab, show_network_tab, show_kwic_tab
 
 # --- MeCab Tagger とフォントの初期化 ---
 tagger = initialize_mecab_tagger()
-if tagger: st.session_state[SESSION_KEY_MECAB_INIT] = True
-else: st.session_state[SESSION_KEY_MECAB_INIT] = False
+if tagger:
+    st.session_state[SESSION_KEY_MECAB_INIT] = True
+else:
+    st.session_state[SESSION_KEY_MECAB_INIT] = False
 
 font_path, font_name = None, None
 if st.session_state.get(SESSION_KEY_MECAB_INIT, False):
     font_path, font_name = setup_japanese_font()
 else:
-    if SESSION_KEY_MECAB_INIT not in st.session_state:
-        st.sidebar.warning("MeCab初期化状態が不明なためフォント設定をスキップします。")
+    if SESSION_KEY_MECAB_INIT not in st.session_state :
+         st.sidebar.warning("MeCab初期化状態が不明なためフォント設定をスキップします。")
 
 # --- 初期値のテキスト ---
 default_analysis_text = """odaお手製のテキスト分析ツールです。日本語の形態素解析を行います。
@@ -90,7 +92,7 @@ if SESSION_KEY_ANALYZED_MORPHS not in st.session_state:
     st.session_state[SESSION_KEY_ANALYZED_MORPHS] = None
 if SESSION_KEY_ANALYZED_TEXT not in st.session_state:
     st.session_state[SESSION_KEY_ANALYZED_TEXT] = ""
-if SESSION_KEY_ACTIVE_TAB not in st.session_state: # アクティブタブの初期化
+if SESSION_KEY_ACTIVE_TAB not in st.session_state:
     st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB
 
 
@@ -127,7 +129,7 @@ if analyze_button:
                 st.success(f"形態素解析が完了しました。総形態素数: {len(morphemes_result)}")
                 st.session_state[SESSION_KEY_ANALYZED_MORPHS] = morphemes_result
                 st.session_state[SESSION_KEY_ANALYZED_TEXT] = text_to_analyze
-                st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB # 分析実行後はデフォルトタブに戻す
+                st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB
 
 # --- 分析結果の表示エリア ---
 if st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is not None:
@@ -138,32 +140,50 @@ if st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is not None:
 
     tab_names = [TAB_NAME_REPORT, TAB_NAME_WC, TAB_NAME_NETWORK, TAB_NAME_KWIC]
     
+    # --- index 計算と ValueError/KeyError ハンドリング (デバッグメッセージ強化版) ---
+    active_tab_value_before_index_calc = st.session_state.get(SESSION_KEY_ACTIVE_TAB, "N/A (Not in session yet)")
     try:
         current_tab_index = tab_names.index(st.session_state[SESSION_KEY_ACTIVE_TAB])
     except ValueError: 
+        st.error(f"エラー(ValueError): セッションステートのタブ名 '{active_tab_value_before_index_calc}' が予期せぬ値のため、デフォルトタブ ('{DEFAULT_ACTIVE_TAB}') に戻します。利用可能なタブ名: {tab_names}")
         current_tab_index = tab_names.index(DEFAULT_ACTIVE_TAB)
         st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB
+    except KeyError:
+        st.error(f"エラー(KeyError): セッションキー '{SESSION_KEY_ACTIVE_TAB}' が存在しません。デフォルトタブ ('{DEFAULT_ACTIVE_TAB}') に戻します。")
+        current_tab_index = tab_names.index(DEFAULT_ACTIVE_TAB)
+        st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB
+    # --- index 計算ここまで ---
 
-    selected_tab_name_from_radio = st.radio( # 変数名を変更して区別
+    # --- on_change コールバック関数の定義 ---
+    def radio_selection_changed():
+        # このコールバックは st.radio の選択が変わり、セッションステートが更新された「後」に呼ばれる
+        # デバッグ用にセッションステートに一時的に値を保存し、後で表示する
+        st.session_state.debug_radio_change_message = f"ラジオボタン選択変更検知: 新しいアクティブタブは '{st.session_state[SESSION_KEY_ACTIVE_TAB]}' です。"
+
+    selected_tab_name_from_radio = st.radio(
         "分析結果表示:",
         options=tab_names,
         index=current_tab_index,
         key=SESSION_KEY_ACTIVE_TAB, 
         horizontal=True,
+        on_change=radio_selection_changed # on_changeコールバックを設定
     )
 
-    # --- ↓↓↓ デバッグ情報表示ここから ↓↓↓ ---
+    # --- デバッグ情報表示 ---
     st.write("--- タブ選択デバッグ情報 ---")
+    if 'debug_radio_change_message' in st.session_state: # on_changeでセットされたメッセージを表示
+        st.write(st.session_state.debug_radio_change_message)
+        del st.session_state.debug_radio_change_message # 一度表示したら消す（または残しても良い）
+
     st.write(f"st.radioから返された選択タブ (selected_tab_name_from_radio): `{selected_tab_name_from_radio}`")
     st.write(f"セッションステートの現在の選択タブ (st.session_state[SESSION_KEY_ACTIVE_TAB]): `{st.session_state.get(SESSION_KEY_ACTIVE_TAB)}`")
     st.write("--- デバッグ情報ここまで ---")
-    # --- ↑↑↑ デバッグ情報表示ここまで ↑↑↑ ---
-
+    
     # --- 選択されたタブに応じて内容を表示 (条件分岐にはセッションステートの値を直接使用) ---
-    active_tab_to_render = st.session_state[SESSION_KEY_ACTIVE_TAB] # セッションステートの値を参照
+    active_tab_to_render = st.session_state[SESSION_KEY_ACTIVE_TAB] 
 
     if active_tab_to_render == TAB_NAME_REPORT:
-        st.write(f"Debug: 「{TAB_NAME_REPORT}」を描画します。") # どの分岐に入ったか確認
+        st.write(f"Debug: 「{TAB_NAME_REPORT}」を描画します。")
         show_report_tab(morphemes_to_display,
                         analysis_options["report_pos"],
                         analysis_options["stop_words"])
@@ -187,12 +207,18 @@ if st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is not None:
         st.write(f"Debug: 「{TAB_NAME_KWIC}」を描画します。")
         show_kwic_tab(morphemes_to_display)
     else:
-        # 通常ここには来ないはずだが、念のため
         st.warning(f"不明なタブが選択されています: {active_tab_to_render}")
 
 else:
-    if not analyze_button:
+    if not analyze_button: # analyze_button はこのスコープでは定義されていないため、より単純な条件にする
+        # st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is None で、かつ
+        # 何らかの操作（例えばサイドバーの変更）で再実行されたが、まだ分析ボタンは押されていない状態を想定
+        # analyze_button 変数は if analyze_button: ... else: のスコープ内なので、ここでは使えない。
+        # 代わりに、 st.session_state に analyze_button が押されたフラグを立てるか、
+        # あるいは単に「分析結果がなければ常にこのメッセージ」とする。
+        # ここでは後者（分析結果がなければ常にメッセージ）を採用。
         st.info("分析したいテキストを入力し、「分析実行」ボタンを押してください。")
+
 
 # --- フッター情報 ---
 st.sidebar.markdown("---")
