@@ -92,7 +92,7 @@ if SESSION_KEY_ANALYZED_MORPHS not in st.session_state:
     st.session_state[SESSION_KEY_ANALYZED_MORPHS] = None
 if SESSION_KEY_ANALYZED_TEXT not in st.session_state:
     st.session_state[SESSION_KEY_ANALYZED_TEXT] = ""
-if SESSION_KEY_ACTIVE_TAB not in st.session_state: # 新しいキー名で初期化
+if SESSION_KEY_ACTIVE_TAB not in st.session_state:
     st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB
 
 
@@ -141,13 +141,13 @@ if st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is not None:
     tab_names = [TAB_NAME_REPORT, TAB_NAME_WC, TAB_NAME_NETWORK, TAB_NAME_KWIC]
     
     # セッションステートに保存されたアクティブタブ名に基づいて、st.radio の初期選択インデックスを決定
-    # この時点で SESSION_KEY_ACTIVE_TAB には、ユーザーが前回選択したタブ名（またはデフォルト）が入っているはず
     try:
-        # セッションステートの値が不正な場合のフォールバック
         if st.session_state.get(SESSION_KEY_ACTIVE_TAB) not in tab_names:
+            st.warning(f"セッションのタブ名 '{st.session_state.get(SESSION_KEY_ACTIVE_TAB)}' が不正のため、デフォルト '{DEFAULT_ACTIVE_TAB}' にします。")
             st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB
         current_tab_index = tab_names.index(st.session_state[SESSION_KEY_ACTIVE_TAB])
-    except Exception: # 何らかの予期せぬエラーでインデックスが見つからない場合
+    except Exception as e: 
+        st.error(f"タブインデックス計算中にエラー: {e}。デフォルトタブに戻します。")
         current_tab_index = tab_names.index(DEFAULT_ACTIVE_TAB)
         st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB
 
@@ -155,30 +155,40 @@ if st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is not None:
     selected_tab_name = st.radio(
         "分析結果表示:",
         options=tab_names,
-        index=current_tab_index,  # 初期表示時の選択
-        key=SESSION_KEY_ACTIVE_TAB, # このキーでセッションステートの値が更新・復元される
+        index=current_tab_index,
+        key=SESSION_KEY_ACTIVE_TAB, 
         horizontal=True
     )
 
-    # # デバッグ用 (必要に応じてコメント解除)
-    # st.write("--- タブ選択デバッグ情報 (After radio) ---")
-    # st.write(f"st.radioから返された選択タブ (selected_tab_name): `{selected_tab_name}`")
-    # st.write(f"セッションステートの現在の選択タブ (st.session_state[SESSION_KEY_ACTIVE_TAB]): `{st.session_state.get(SESSION_KEY_ACTIVE_TAB)}`")
-    # st.write("--- デバッグ情報ここまで ---")
+    # --- デバッグ情報表示 ---
+    st.write("--- タブ選択デバッグ情報 (After radio) ---")
+    st.write(f"st.radioから返された値 (selected_tab_name): `{selected_tab_name}`")
+    active_in_session = st.session_state.get(SESSION_KEY_ACTIVE_TAB)
+    st.write(f"セッションステートの値 (st.session_state['{SESSION_KEY_ACTIVE_TAB}']): `{active_in_session}` (型: {type(active_in_session)})")
+    st.write(f"比較対象の定数 TAB_NAME_REPORT: `{TAB_NAME_REPORT}` (型: {type(TAB_NAME_REPORT)})")
+    st.write(f"比較対象の定数 TAB_NAME_WC: `{TAB_NAME_WC}` (型: {type(TAB_NAME_WC)})")
+    st.write(f"比較対象の定数 TAB_NAME_NETWORK: `{TAB_NAME_NETWORK}` (型: {type(TAB_NAME_NETWORK)})")
+    st.write(f"比較対象の定数 TAB_NAME_KWIC: `{TAB_NAME_KWIC}` (型: {type(TAB_NAME_KWIC)})")
+    st.write("--- デバッグ情報ここまで ---")
     
     # 選択されたタブ (セッションステートの値) に応じて内容を表示
     active_tab_to_render = st.session_state[SESSION_KEY_ACTIVE_TAB] 
+    st.write(f"Debug: 条件分岐に使用する active_tab_to_render: `{active_tab_to_render}`")
+
 
     if active_tab_to_render == TAB_NAME_REPORT:
+        st.write(f"Debug: 「{TAB_NAME_REPORT}」の条件に一致しました。描画します。")
         show_report_tab(morphemes_to_display,
                         analysis_options["report_pos"],
                         analysis_options["stop_words"])
     elif active_tab_to_render == TAB_NAME_WC:
+        st.write(f"Debug: 「{TAB_NAME_WC}」の条件に一致しました。描画します。")
         show_wordcloud_tab(morphemes_to_display,
                            font_path,
                            analysis_options["wc_pos"],
                            analysis_options["stop_words"])
     elif active_tab_to_render == TAB_NAME_NETWORK:
+        st.write(f"Debug: 「{TAB_NAME_NETWORK}」の条件に一致しました。描画します。")
         show_network_tab(morphemes_to_display,
                          analyzed_text_for_network,
                          TAGGER_OPTIONS,
@@ -188,10 +198,10 @@ if st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is not None:
                          analysis_options["node_min_freq"],
                          analysis_options["edge_min_freq"])
     elif active_tab_to_render == TAB_NAME_KWIC:
+        st.write(f"Debug: 「{TAB_NAME_KWIC}」の条件に一致しました。描画します。")
         show_kwic_tab(morphemes_to_display)
     else:
-        # このケースは通常発生しないはず
-        st.warning(f"不明なタブが選択されています: {active_tab_to_render}")
+        st.warning(f"Debug: どのタブの条件にも一致しませんでした。active_tab_to_render: '{active_tab_to_render}'")
 else:
     st.info("分析したいテキストを入力し、「分析実行」ボタンを押してください。")
 
