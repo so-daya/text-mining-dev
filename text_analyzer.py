@@ -12,6 +12,7 @@ import os
 import numpy as np
 from itertools import combinations
 import streamlit as st
+import html # ★XSS対策のためhtmlモジュールをインポート
 
 from config import TAGGER_OPTIONS, FONT_PATH_PRIMARY, PYVIS_OPTIONS_STR
 
@@ -21,7 +22,7 @@ def initialize_mecab_tagger():
     try:
         tagger_obj = MeCab.Tagger(TAGGER_OPTIONS)
         tagger_obj.parse('') 
-        # print("MeCab Tagger initialized successfully via cache.")
+        # print("MeCab Tagger initialized successfully via cache.") # ★情報漏洩対策: コメントアウト
         return tagger_obj
     except Exception as e_init:
         st.error(f"MeCab Taggerの初期化に失敗しました: {e_init}")
@@ -40,7 +41,7 @@ def setup_japanese_font():
     if os.path.exists(FONT_PATH_PRIMARY):
         font_path_final = FONT_PATH_PRIMARY
         font_name_final = os.path.splitext(os.path.basename(font_path_final))[0]
-        print(f"プライマリ日本語フォント '{font_name_final}' を使用します。")
+        # print(f"プライマリ日本語フォント '{font_name_final}' を使用します。") # ★情報漏洩対策: コメントアウト
     else:
         st.sidebar.error(f"指定されたプライマリフォント '{FONT_PATH_PRIMARY}' が見つかりません。代替フォントを検索します。")
         try:
@@ -66,7 +67,7 @@ def setup_japanese_font():
             if font_name_final not in [f.name for f in fm.fontManager.ttflist]:
                  fm.fontManager.ttflist.append(font_entry)
             plt.rcParams['font.family'] = font_name_final
-            # print(f"Matplotlibのデフォルトフォントとして '{font_name_final}' を設定しました。")
+            # print(f"Matplotlibのデフォルトフォントとして '{font_name_final}' を設定しました。") # ★情報漏洩対策: コメントアウト
             return font_path_final, font_name_final
         except Exception as e_font_setting:
             st.sidebar.error(f"Matplotlibへの日本語フォント設定中にエラーが発生しました: {e_font_setting}")
@@ -122,12 +123,10 @@ def generate_word_report(_all_morphemes_tuple, target_pos_list_tuple, stop_words
     if not all_morphemes:
         return pd.DataFrame(), 0, 0
 
-    # --- ★修正点: 名詞の細分類除外リストを変更 ---
     report_target_morphemes = filter_morphemes(
         all_morphemes, target_pos_list, stop_words_set,
-        noun_subtype_exclusions=['非自立', '数', '代名詞', '接尾'] # 'サ変接続', '副詞可能' を削除
+        noun_subtype_exclusions=['非自立', '数', '代名詞', '接尾'] # サ変接続, 副詞可能 を除外しない
     )
-    # --- ★修正点ここまで ---
 
     if not report_target_morphemes:
         return pd.DataFrame(), len(all_morphemes), 0
@@ -167,7 +166,7 @@ def generate_wordcloud_image(_morphemes_data_tuple, font_path_wc, target_pos_lis
 
     wordcloud_source_morphemes = filter_morphemes(
         all_morphemes, target_pos_list, stop_words_set,
-        noun_subtype_exclusions=['数', '非自立', '代名詞', '接尾'] # ワードクラウドの基準（変更なし）
+        noun_subtype_exclusions=['数', '非自立', '代名詞', '接尾']
     )
     wordcloud_words = [m['原形'] for m in wordcloud_source_morphemes]
     wordcloud_text_input_str = " ".join(wordcloud_words)
@@ -253,10 +252,18 @@ def generate_cooccurrence_network_html(_morphemes_data_tuple, text_input_co, _ta
     
     for word, count in node_candidates_dict.items():
         node_size = int(np.sqrt(count) * 10 + 10)
-        node_label_with_count = f"{word}\n({count})" 
+        
+        # --- ★XSS対策: html.escape() を適用 ---
+        escaped_word = html.escape(word) 
+        node_label_with_count = f"{escaped_word}\n({count})" 
+        node_title = f"{escaped_word} (出現数: {count})"
+        # --- ★修正ここまで ---
+
         net_graph.add_node(
-            word, label=node_label_with_count, size=node_size, 
-            title=f"{word} (出現数: {count})", 
+            word, # ノードIDは元の単語のまま
+            label=node_label_with_count, 
+            size=node_size, 
+            title=node_title, 
             font={'face': pyvis_font_face, 'size': 12, 'color': '#333333'}, 
             borderWidth=1, color={'border': '#666666', 'background': '#D2E5FF'}
         )
@@ -265,6 +272,8 @@ def generate_cooccurrence_network_html(_morphemes_data_tuple, text_input_co, _ta
     for pair_nodes, freq_cooc in cooccurrence_counts_map.items():
         if freq_cooc >= edge_min_freq:
             edge_width = float(np.log1p(freq_cooc) * 1.5 + 0.5)
+            # エッジのタイトルも念のためエスケープ (もし単語ペアをタイトルに含める場合)
+            # current_edge_title = f"共起回数: {freq_cooc}" # このままならエスケープ不要
             net_graph.add_edge(pair_nodes[0], pair_nodes[1], value=edge_width, 
                                title=f"共起回数: {freq_cooc}", 
                                color={'color': '#cccccc', 'highlight': '#848484', 'opacity':0.6})
