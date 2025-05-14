@@ -129,6 +129,7 @@ if analyze_button:
                 st.success(f"形態素解析が完了しました。総形態素数: {len(morphemes_result)}")
                 st.session_state[SESSION_KEY_ANALYZED_MORPHS] = morphemes_result
                 st.session_state[SESSION_KEY_ANALYZED_TEXT] = text_to_analyze
+                # 「分析実行」時はデフォルトタブに戻す
                 st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB
 
 # --- 分析結果の表示エリア ---
@@ -140,47 +141,48 @@ if st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is not None:
 
     tab_names = [TAB_NAME_REPORT, TAB_NAME_WC, TAB_NAME_NETWORK, TAB_NAME_KWIC]
     
-    # --- on_change コールバック関数の定義 ---
-    def handle_tab_selection_change():
-        # このコールバックは st.radio の値が変わり、対応するセッションステート(keyで指定したもの)が更新された「後」に呼ばれる
-        # そのため、st.session_state[SESSION_KEY_ACTIVE_TAB] は既に新しい選択値を反映しているはず
-        st.session_state.debug_radio_on_change_message = f"on_change発火: st.session_state['{SESSION_KEY_ACTIVE_TAB}'] は '{st.session_state.get(SESSION_KEY_ACTIVE_TAB)}' になりました。"
+    # --- st.radio の index パラメータを設定するための準備 ---
+    # 現在のセッションステートに保存されているアクティブタブに基づいてインデックスを決定
+    # 初回や不正な値の場合はデフォルトタブにする
+    active_tab_in_session_for_index = st.session_state.get(SESSION_KEY_ACTIVE_TAB, DEFAULT_ACTIVE_TAB)
+    if active_tab_in_session_for_index not in tab_names:
+        # st.warning(f"セッションのタブ名 '{active_tab_in_session_for_index}' が不正のため、デフォルト '{DEFAULT_ACTIVE_TAB}' にします。")
+        active_tab_in_session_for_index = DEFAULT_ACTIVE_TAB
+        st.session_state[SESSION_KEY_ACTIVE_TAB] = active_tab_in_session_for_index # 不正な値を修正
+    current_tab_index = tab_names.index(active_tab_in_session_for_index)
 
-    # st.radio の index パラメータを設定するための準備
-    # セッションステートに保存されているアクティブタブ名に基づいてインデックスを決定
-    try:
-        if st.session_state.get(SESSION_KEY_ACTIVE_TAB) not in tab_names:
-            # st.warning(f"セッションのタブ名 '{st.session_state.get(SESSION_KEY_ACTIVE_TAB)}' が不正のため、デフォルト '{DEFAULT_ACTIVE_TAB}' にします。")
-            st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB
-        current_tab_index = tab_names.index(st.session_state[SESSION_KEY_ACTIVE_TAB])
-    except Exception: 
-        # st.error(f"タブインデックス計算中にエラー。デフォルトタブに戻します。")
-        current_tab_index = tab_names.index(DEFAULT_ACTIVE_TAB)
-        st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB
-
-    # st.radio でタブ選択UIを作成
+    # --- st.radio でタブ選択UIを作成 (key パラメータを削除) ---
+    # 返り値でユーザーが選択したタブ名を取得する
     selected_tab_name = st.radio(
         "分析結果表示:",
         options=tab_names,
-        index=current_tab_index, # 現在のセッションステートに基づいたインデックス
-        key=SESSION_KEY_ACTIVE_TAB,  # セッションステートと双方向バインド
-        horizontal=True,
-        on_change=handle_tab_selection_change # 値変更時にコールバックを実行
+        index=current_tab_index, # 初期表示および状態復元のためのインデックス
+        # key=SESSION_KEY_ACTIVE_TAB, # key パラメータを削除
+        horizontal=True
+        # on_change コールバックも削除 (keyがない場合はあまり意味がない)
     )
 
+    # --- ラジオボタンの現在の選択をセッションステートに「手動で」保存 ---
+    # これにより、次の再実行時に current_tab_index が正しく計算されることを期待
+    if st.session_state.get(SESSION_KEY_ACTIVE_TAB) != selected_tab_name:
+        st.session_state[SESSION_KEY_ACTIVE_TAB] = selected_tab_name
+        # ★重要: セッションステートを変更した後は、表示を正しく更新するために再実行を促す
+        # ただし、この位置で st.rerun() を呼ぶと無限ループになる可能性があるため、
+        # Streamlitがウィジェットの値変更を検知して自動で再実行するのに任せる。
+        # この代入は、次の再実行サイクルで active_tab_in_session_for_index に反映される。
+
     # --- デバッグ情報表示 ---
-    st.write("--- タブ選択デバッグ情報 (After radio) ---")
-    if 'debug_radio_on_change_message' in st.session_state:
-        st.write(st.session_state.debug_radio_on_change_message)
-        # on_change メッセージはデバッグのために残しておいても良い
-        # del st.session_state.debug_radio_on_change_message 
+    st.write("--- タブ選択デバッグ情報 (keyなし、手動更新) ---")
     st.write(f"st.radioから返された値 (selected_tab_name): `{selected_tab_name}`")
-    active_in_session = st.session_state.get(SESSION_KEY_ACTIVE_TAB)
-    st.write(f"セッションステートの値 (st.session_state['{SESSION_KEY_ACTIVE_TAB}']): `{active_in_session}` (型: {type(active_in_session)})")
+    active_in_session_after_manual_update = st.session_state.get(SESSION_KEY_ACTIVE_TAB)
+    st.write(f"手動更新後のセッションステートの値 (st.session_state['{SESSION_KEY_ACTIVE_TAB}']): `{active_in_session_after_manual_update}`")
     st.write("--- デバッグ情報ここまで ---")
     
+    # --- 選択されたタブに応じて内容を表示 ---
+    # 条件分岐には、更新されたセッションステートの値を使用
     active_tab_to_render = st.session_state[SESSION_KEY_ACTIVE_TAB] 
-    # st.write(f"Debug: 条件分岐に使用する active_tab_to_render: `{active_tab_to_render}`") # 必要ならコメント解除
+    # st.write(f"Debug: 条件分岐に使用する active_tab_to_render: `{active_tab_to_render}`")
+
 
     if active_tab_to_render == TAB_NAME_REPORT:
         # st.write(f"Debug: 「{TAB_NAME_REPORT}」の条件に一致しました。描画します。")
