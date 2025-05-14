@@ -109,8 +109,8 @@ TAB_NAME_REPORT = "📊 単語出現レポート"
 TAB_NAME_WC = "☁️ ワードクラウド"
 TAB_NAME_NETWORK = "🕸️ 共起ネットワーク"
 TAB_NAME_KWIC = "🔍 KWIC検索"
-DEFAULT_ACTIVE_TAB = TAB_NAME_REPORT # デフォルトで開くタブ
-SESSION_KEY_ACTIVE_TAB = 'active_analysis_tab' # 現在アクティブなタブを保存するキー
+DEFAULT_ACTIVE_TAB = TAB_NAME_REPORT
+SESSION_KEY_ACTIVE_TAB = 'main_active_tab_selector'
 
 # --- アプリケーション情報 ---
-APP_VERSION = "0.3.4" # バージョン更新
+APP_VERSION = "0.3.5" # バージョン更新
