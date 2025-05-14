@@ -20,12 +20,12 @@ def initialize_mecab_tagger():
     """MeCab.Taggerを初期化して返す。結果はキャッシュされる。"""
     try:
         tagger_obj = MeCab.Tagger(TAGGER_OPTIONS)
-        tagger_obj.parse('') # 初期化成功確認用
-        # print("MeCab Tagger initialized successfully via cache.") # デプロイ時はコメントアウト推奨
+        tagger_obj.parse('') 
+        # print("MeCab Tagger initialized successfully via cache.")
         return tagger_obj
     except Exception as e_init:
         st.error(f"MeCab Taggerの初期化に失敗しました: {e_init}")
-        st.error("リポジトリに `packages.txt` が正しく設定され、MeCab関連パッケージがインストールされているか確認してください。")
+        st.error("リポジトリに `packages.txt` が正しく設定され、MeCab関連パッケージがインストールされるか確認してください。")
         return None
 
 @st.cache_resource
@@ -40,20 +40,17 @@ def setup_japanese_font():
     if os.path.exists(FONT_PATH_PRIMARY):
         font_path_final = FONT_PATH_PRIMARY
         font_name_final = os.path.splitext(os.path.basename(font_path_final))[0]
-        # st.sidebar.info(f"日本語フォントとして '{font_name_final}' を使用します。") # UI表示はapp.py側に集約または削除
-        print(f"プライマリ日本語フォント '{font_name_final}' を使用します。") # ログ出力は残す
+        print(f"プライマリ日本語フォント '{font_name_final}' を使用します。")
     else:
         st.sidebar.error(f"指定されたプライマリフォント '{FONT_PATH_PRIMARY}' が見つかりません。代替フォントを検索します。")
         try:
             common_jp_font_keywords = ['ipagp', 'ipag', 'takao', 'noto sans cjk jp', 'hiragino', 'ms gothic', 'meiryo']
             available_fonts = [f.name for f in fm.fontManager.ttflist]
-            
             found_jp_font_name = None
             for font_name_candidate in available_fonts:
                 if any(keyword in font_name_candidate.lower() for keyword in common_jp_font_keywords):
                     found_jp_font_name = font_name_candidate
                     break
-            
             if found_jp_font_name:
                 font_name_final = found_jp_font_name
                 font_path_final = fm.findfont(fm.FontProperties(family=font_name_final))
@@ -68,21 +65,16 @@ def setup_japanese_font():
             font_entry = fm.FontEntry(fname=font_path_final, name=font_name_final)
             if font_name_final not in [f.name for f in fm.fontManager.ttflist]:
                  fm.fontManager.ttflist.append(font_entry)
-            
             plt.rcParams['font.family'] = font_name_final
-            # print(f"Matplotlibのデフォルトフォントとして '{font_name_final}' を設定しました。") # ログ出力は残す
+            # print(f"Matplotlibのデフォルトフォントとして '{font_name_final}' を設定しました。")
             return font_path_final, font_name_final
         except Exception as e_font_setting:
             st.sidebar.error(f"Matplotlibへの日本語フォント設定中にエラーが発生しました: {e_font_setting}")
-            
     return None, None
 
 @st.cache_data
 def perform_morphological_analysis(text_input, _tagger_config_identifier=None):
-    """
-    入力テキストを形態素解析し、形態素のリストを返す。
-    _tagger_config_identifier はTaggerの設定が変わった場合にキャッシュを区別するためのダミー引数。
-    """
+    """入力テキストを形態素解析し、形態素のリストを返す。"""
     tagger_instance = initialize_mecab_tagger()
     if tagger_instance is None or not text_input.strip():
         return []
@@ -95,7 +87,6 @@ def perform_morphological_analysis(text_input, _tagger_config_identifier=None):
             original_form = features[6] if features[6] != '*' else node.surface
             reading = features[7] if len(features) > 7 and features[7] != '*' else ''
             pronunciation = features[8] if len(features) > 8 and features[8] != '*' else ''
-            
             all_morphemes.append({
                 '表層形': node.surface, '原形': original_form,
                 '品詞': features[0], '品詞細分類1': features[1], '品詞細分類2': features[2],
@@ -109,7 +100,7 @@ def filter_morphemes(all_morphemes, target_pos_list, stop_words_set,
                      noun_subtype_exclusions=None, min_len_non_noun=0):
     """指定された条件で形態素リストをフィルタリングする。"""
     if noun_subtype_exclusions is None:
-        noun_subtype_exclusions=['非自立', '数', '代名詞', '接尾'] # 'サ変接続', '副詞可能' をリストから削除
+        noun_subtype_exclusions = ['非自立', '数', '代名詞', '接尾', 'サ変接続', '副詞可能']
         
     filtered_morphemes = []
     for m in all_morphemes:
@@ -131,10 +122,12 @@ def generate_word_report(_all_morphemes_tuple, target_pos_list_tuple, stop_words
     if not all_morphemes:
         return pd.DataFrame(), 0, 0
 
+    # --- ★修正点: 名詞の細分類除外リストを変更 ---
     report_target_morphemes = filter_morphemes(
         all_morphemes, target_pos_list, stop_words_set,
-        noun_subtype_exclusions=['非自立', '数', '代名詞', '接尾', 'サ変接続', '副詞可能'] 
+        noun_subtype_exclusions=['非自立', '数', '代名詞', '接尾'] # 'サ変接続', '副詞可能' を削除
     )
+    # --- ★修正点ここまで ---
 
     if not report_target_morphemes:
         return pd.DataFrame(), len(all_morphemes), 0
@@ -174,7 +167,7 @@ def generate_wordcloud_image(_morphemes_data_tuple, font_path_wc, target_pos_lis
 
     wordcloud_source_morphemes = filter_morphemes(
         all_morphemes, target_pos_list, stop_words_set,
-        noun_subtype_exclusions=['数', '非自立', '代名詞', '接尾']
+        noun_subtype_exclusions=['数', '非自立', '代名詞', '接尾'] # ワードクラウドの基準（変更なし）
     )
     wordcloud_words = [m['原形'] for m in wordcloud_source_morphemes]
     wordcloud_text_input_str = " ".join(wordcloud_words)
