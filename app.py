@@ -1,4 +1,4 @@
-# app.py (全体を置き換えてください)
+# app.py
 import streamlit as st
 import os
 
@@ -129,7 +129,7 @@ if analyze_button:
                 st.success(f"形態素解析が完了しました。総形態素数: {len(morphemes_result)}")
                 st.session_state[SESSION_KEY_ANALYZED_MORPHS] = morphemes_result
                 st.session_state[SESSION_KEY_ANALYZED_TEXT] = text_to_analyze
-                st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB
+                st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB # 分析実行後はデフォルトタブに
 
 # --- 分析結果の表示エリア ---
 if st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is not None:
@@ -140,69 +140,49 @@ if st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is not None:
 
     tab_names = [TAB_NAME_REPORT, TAB_NAME_WC, TAB_NAME_NETWORK, TAB_NAME_KWIC]
     
-    # --- 詳細なデバッグ情報表示を追加 ---
-    st.write("--- Value Comparison Debug (Before try-except) ---")
-    current_session_tab_for_index = st.session_state.get(SESSION_KEY_ACTIVE_TAB)
-    st.write(f"Current session tab for index calculation: '{current_session_tab_for_index}' (Type: {type(current_session_tab_for_index)})")
-    st.write(f"tab_names list: {tab_names}")
-    if current_session_tab_for_index is not None: # Noneでなければ比較
-        for i, name_in_list in enumerate(tab_names):
-            match = (current_session_tab_for_index == name_in_list)
-            st.write(f"Comparing with tab_names[{i}]: '{name_in_list}' (Type: {type(name_in_list)}) - Match: {match}")
-            if not match and isinstance(current_session_tab_for_index, str) and isinstance(name_in_list, str):
-                 if current_session_tab_for_index.strip() == name_in_list.strip() and current_session_tab_for_index != name_in_list:
-                     st.warning(f"  -> Whitespace difference? Session: '{current_session_tab_for_index}' vs List: '{name_in_list}'")
-
-    st.write("--- Value Comparison Debug End ---")
-    # --- 詳細なデバッグ情報表示ここまで ---
-
-    active_tab_value_before_index_calc = st.session_state.get(SESSION_KEY_ACTIVE_TAB, "N/A (Not in session yet)")
+    # `index` パラメータは、セッションステートにキーが存在しない場合の初期選択に使われる。
+    # `key` が指定されていれば、基本的にはセッションステートの値が優先される。
+    # `ValueError` や `KeyError` が発生していないことは確認済みなので、
+    # `index` の計算はシンプルにしても良いが、念のため残しておく。
     try:
         current_tab_index = tab_names.index(st.session_state[SESSION_KEY_ACTIVE_TAB])
-    except ValueError: 
-        st.error(f"エラー(ValueError): セッションステートのタブ名 '{active_tab_value_before_index_calc}' が予期せぬ値のため、デフォルトタブ ('{DEFAULT_ACTIVE_TAB}') に戻します。利用可能なタブ名: {tab_names}")
+    except (ValueError, KeyError): 
+        # st.warning(f"アクティブタブの値 '{st.session_state.get(SESSION_KEY_ACTIVE_TAB)}' が不正か未設定のため、デフォルトに戻します。") # デバッグ用
         current_tab_index = tab_names.index(DEFAULT_ACTIVE_TAB)
         st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB
-    except KeyError:
-        st.error(f"エラー(KeyError): セッションキー '{SESSION_KEY_ACTIVE_TAB}' が存在しません。デフォルトタブ ('{DEFAULT_ACTIVE_TAB}') に戻します。")
-        current_tab_index = tab_names.index(DEFAULT_ACTIVE_TAB)
-        st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB
-
-    def radio_selection_changed():
-        st.session_state.debug_radio_change_message = f"ラジオボタン選択変更検知: 新しいアクティブタブは '{st.session_state[SESSION_KEY_ACTIVE_TAB]}' です。"
 
     selected_tab_name_from_radio = st.radio(
         "分析結果表示:",
         options=tab_names,
-        index=current_tab_index,
+        index=current_tab_index,  # indexは初期表示のため、keyによる状態復元を優先
         key=SESSION_KEY_ACTIVE_TAB, 
-        horizontal=True,
-        on_change=radio_selection_changed
+        horizontal=True
+        # on_change コールバックは、key があれば通常不要（値の同期はkeyが行う）
+        # on_change を使うのは、値変更時に「追加の」処理をしたい場合
     )
 
-    st.write("--- タブ選択デバッグ情報 (After radio) ---") # ラジオボタン描画後の状態を確認
-    if 'debug_radio_change_message' in st.session_state:
-        st.write(st.session_state.debug_radio_change_message)
-        # del st.session_state.debug_radio_change_message # すぐ消さずに残しておく
+    # --- デバッグ情報表示 (問題切り分けのため残します) ---
+    st.write("--- タブ選択デバッグ情報 (After radio) ---")
     st.write(f"st.radioから返された選択タブ (selected_tab_name_from_radio): `{selected_tab_name_from_radio}`")
     st.write(f"セッションステートの現在の選択タブ (st.session_state[SESSION_KEY_ACTIVE_TAB]): `{st.session_state.get(SESSION_KEY_ACTIVE_TAB)}`")
     st.write("--- デバッグ情報ここまで ---")
     
+    # --- 選択されたタブに応じて内容を表示 (条件分岐にはセッションステートの値を直接使用) ---
     active_tab_to_render = st.session_state[SESSION_KEY_ACTIVE_TAB] 
 
     if active_tab_to_render == TAB_NAME_REPORT:
-        st.write(f"Debug: 「{TAB_NAME_REPORT}」を描画します。")
+        # st.write(f"Debug: 「{TAB_NAME_REPORT}」を描画します。") # 必要ならコメント解除
         show_report_tab(morphemes_to_display,
                         analysis_options["report_pos"],
                         analysis_options["stop_words"])
     elif active_tab_to_render == TAB_NAME_WC:
-        st.write(f"Debug: 「{TAB_NAME_WC}」を描画します。")
+        # st.write(f"Debug: 「{TAB_NAME_WC}」を描画します。")
         show_wordcloud_tab(morphemes_to_display,
                            font_path,
                            analysis_options["wc_pos"],
                            analysis_options["stop_words"])
     elif active_tab_to_render == TAB_NAME_NETWORK:
-        st.write(f"Debug: 「{TAB_NAME_NETWORK}」を描画します。")
+        # st.write(f"Debug: 「{TAB_NAME_NETWORK}」を描画します。")
         show_network_tab(morphemes_to_display,
                          analyzed_text_for_network,
                          TAGGER_OPTIONS,
@@ -212,7 +192,7 @@ if st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is not None:
                          analysis_options["node_min_freq"],
                          analysis_options["edge_min_freq"])
     elif active_tab_to_render == TAB_NAME_KWIC:
-        st.write(f"Debug: 「{TAB_NAME_KWIC}」を描画します。")
+        # st.write(f"Debug: 「{TAB_NAME_KWIC}」を描画します。")
         show_kwic_tab(morphemes_to_display)
     else:
         st.warning(f"不明なタブが選択されています: {active_tab_to_render}")
