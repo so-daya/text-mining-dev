@@ -2,11 +2,11 @@
 import streamlit as st
 import pandas as pd
 import re
-import os # os.path.basename のため (ただし、キャプション削除により不要になる可能性あり)
+import os 
 
 from config import (DEFAULT_TARGET_POS, GENERAL_STOP_WORDS,
                     SESSION_KEY_KWIC_KEYWORD, SESSION_KEY_KWIC_MODE_IDX, SESSION_KEY_KWIC_WINDOW_VAL,
-                    SESSION_KEY_ACTIVE_TAB, TAB_NAME_KWIC) # KWICタブのon_changeで使用
+                    SESSION_KEY_ACTIVE_TAB, TAB_NAME_KWIC)
 from text_analyzer import (generate_word_report, generate_wordcloud_image,
                            generate_cooccurrence_network_html, perform_kwic_search)
 
@@ -28,7 +28,8 @@ def show_sidebar_options():
     custom_stopwords_input = st.sidebar.text_area(
         "共通ストップワード (原形をカンマや改行区切りで入力):",
         value=default_stopwords_str,
-        help="ここに入力した単語（原形）がストップワードとして処理されます。デフォルトのストップワードも含まれています。"
+        help="ここに入力した単語（原形）がストップワードとして処理されます。デフォルトのストップワードも含まれています。",
+        max_chars=5000 # ★DoS対策: 文字数制限を追加
     )
     
     final_stop_words = set()
@@ -41,7 +42,7 @@ def show_sidebar_options():
     st.sidebar.markdown("---")
     st.sidebar.markdown("**共起ネットワーク詳細設定**")
     node_min_freq = st.sidebar.slider("ノード最低出現数:", 1, 20, 2, key="net_node_freq_slider_main")
-    edge_min_freq = st.sidebar.slider("エッジ最低共起数:", 1, 10, 1, key="net_edge_freq_slider_main")
+    edge_min_freq = st.sidebar.slider("エッジ最低共起数:", 1, 10, 1, key="net_edge_freq_slider_main") 
 
     return {
         "report_pos": report_target_pos,
@@ -57,7 +58,7 @@ def show_report_tab(morphemes_data, target_pos, stop_words):
     st.subheader("📊 単語出現レポート")
     with st.spinner("レポート作成中..."):
         df_report, total_morphs, total_target_morphs = generate_word_report(
-            tuple(morphemes_data), tuple(target_pos), tuple(stop_words) # キャッシュのためタプル化
+            tuple(morphemes_data), tuple(target_pos), tuple(stop_words)
         )
         st.caption(f"総形態素数: {total_morphs} | レポート対象の異なり語数: {len(df_report)} | レポート対象の延べ語数: {total_target_morphs}")
         if not df_report.empty:
@@ -76,7 +77,6 @@ def show_wordcloud_tab(morphemes_data, font_path, target_pos, stop_words):
             )
             if fig_wc:
                 st.pyplot(fig_wc)
-        # st.caption(f"使用フォント: {os.path.basename(font_path) if font_path else '未設定'}") # ★削除
     else:
         st.error("日本語フォントの準備ができていません。ワードクラウドは表示できません。")
 
@@ -92,7 +92,6 @@ def show_network_tab(morphemes_data, text_input, tagger_dummy, font_path, font_n
             )
             if html_cooc:
                 st.components.v1.html(html_cooc, height=750, scrolling=True)
-        # st.caption(f"使用フォント (ノードラベル): {font_name if font_name else '未設定'}") # ★削除
     else:
         st.error("日本語フォントの準備ができていません。共起ネットワークは表示できません。")
 
@@ -100,7 +99,6 @@ def show_kwic_tab(morphemes_data):
     """「KWIC検索」タブの内容を表示する。"""
     st.subheader("🔍 KWIC検索 (文脈付きキーワード検索)")
 
-    # --- コールバック関数の定義 (KWICタブをアクティブに保つため) ---
     def update_kwic_keyword_and_active_tab():
         st.session_state[SESSION_KEY_KWIC_KEYWORD] = st.session_state.kwic_keyword_input_field_tab
         st.session_state[SESSION_KEY_ACTIVE_TAB] = TAB_NAME_KWIC
@@ -114,15 +112,13 @@ def show_kwic_tab(morphemes_data):
         st.session_state[SESSION_KEY_KWIC_WINDOW_VAL] = st.session_state.kwic_window_slider_field_tab
         st.session_state[SESSION_KEY_ACTIVE_TAB] = TAB_NAME_KWIC
 
-    # --- セッションステートの初期化 (このタブ専用のキー) ---
     if SESSION_KEY_KWIC_KEYWORD not in st.session_state:
         st.session_state[SESSION_KEY_KWIC_KEYWORD] = ""
     if SESSION_KEY_KWIC_MODE_IDX not in st.session_state:
-        st.session_state[SESSION_KEY_KWIC_MODE_IDX] = 0 # "原形一致"
+        st.session_state[SESSION_KEY_KWIC_MODE_IDX] = 0 
     if SESSION_KEY_KWIC_WINDOW_VAL not in st.session_state:
         st.session_state[SESSION_KEY_KWIC_WINDOW_VAL] = 5
 
-    # --- UIウィジェット ---
     kwic_keyword_input_val = st.text_input(
         "KWIC検索キーワード:",
         value=st.session_state[SESSION_KEY_KWIC_KEYWORD],
@@ -132,7 +128,7 @@ def show_kwic_tab(morphemes_data):
     )
 
     kwic_search_options_list = ("原形一致", "表層形一致")
-    st.radio( # 返り値は使わないので代入しない
+    st.radio( 
         "KWIC検索モード:", kwic_search_options_list,
         index=st.session_state[SESSION_KEY_KWIC_MODE_IDX],
         key="kwic_mode_radio_field_tab",
@@ -140,15 +136,13 @@ def show_kwic_tab(morphemes_data):
         horizontal=True
     )
 
-    st.slider( # 返り値は使わないので代入しない
+    st.slider(
         "KWIC表示文脈の形態素数 (前後各):", 1, 15,
-        value=st.session_state[SESSION_KEY_KWIC_WINDOW_VAL], # value で現在の値を表示
+        value=st.session_state[SESSION_KEY_KWIC_WINDOW_VAL],
         key="kwic_window_slider_field_tab",
         on_change=update_kwic_window_and_active_tab
     )
-
-    # --- 検索実行と結果表示 ---
-    # 検索にはセッションステートの現在のキーワードを使用
+    
     current_kwic_keyword = st.session_state[SESSION_KEY_KWIC_KEYWORD]
     if current_kwic_keyword.strip():
         search_key_type_for_kwic_val = '原形' if st.session_state[SESSION_KEY_KWIC_MODE_IDX] == 0 else '表層形'
