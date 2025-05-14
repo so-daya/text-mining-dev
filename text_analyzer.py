@@ -16,7 +16,7 @@ import html # ★XSS対策のためhtmlモジュールをインポート
 
 from config import TAGGER_OPTIONS, FONT_PATH_PRIMARY, PYVIS_OPTIONS_STR
 
-# @st.cache_resource
+@st.cache_resource
 def initialize_mecab_tagger():
     """MeCab.Taggerを初期化して返す。結果はキャッシュされる。"""
     try:
@@ -113,7 +113,7 @@ def filter_morphemes(all_morphemes, target_pos_list, stop_words_set,
             filtered_morphemes.append(m)
     return filtered_morphemes
 
-@st.cache_data
+# @st.cache_data
 def generate_word_report(_all_morphemes_tuple, target_pos_list_tuple, stop_words_set_tuple):
     """形態素リストから単語出現レポートのDataFrameを生成する。"""
     all_morphemes = list(_all_morphemes_tuple)
@@ -150,7 +150,7 @@ def generate_word_report(_all_morphemes_tuple, target_pos_list_tuple, stop_words
         })
     return pd.DataFrame(report_data), total_morphemes_count, sum(word_counts.values())
 
-@st.cache_data
+# @st.cache_data
 def generate_wordcloud_image(_morphemes_data_tuple, font_path_wc, target_pos_list_tuple, stop_words_set_tuple):
     """形態素リストからワードクラウド画像を生成する。"""
     all_morphemes = list(_morphemes_data_tuple)
