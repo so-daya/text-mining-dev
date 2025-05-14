@@ -1,4 +1,4 @@
-# app.py
+# app.py (全体を置き換えてください)
 import streamlit as st
 import os
 
@@ -140,7 +140,22 @@ if st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is not None:
 
     tab_names = [TAB_NAME_REPORT, TAB_NAME_WC, TAB_NAME_NETWORK, TAB_NAME_KWIC]
     
-    # --- index 計算と ValueError/KeyError ハンドリング (デバッグメッセージ強化版) ---
+    # --- 詳細なデバッグ情報表示を追加 ---
+    st.write("--- Value Comparison Debug (Before try-except) ---")
+    current_session_tab_for_index = st.session_state.get(SESSION_KEY_ACTIVE_TAB)
+    st.write(f"Current session tab for index calculation: '{current_session_tab_for_index}' (Type: {type(current_session_tab_for_index)})")
+    st.write(f"tab_names list: {tab_names}")
+    if current_session_tab_for_index is not None: # Noneでなければ比較
+        for i, name_in_list in enumerate(tab_names):
+            match = (current_session_tab_for_index == name_in_list)
+            st.write(f"Comparing with tab_names[{i}]: '{name_in_list}' (Type: {type(name_in_list)}) - Match: {match}")
+            if not match and isinstance(current_session_tab_for_index, str) and isinstance(name_in_list, str):
+                 if current_session_tab_for_index.strip() == name_in_list.strip() and current_session_tab_for_index != name_in_list:
+                     st.warning(f"  -> Whitespace difference? Session: '{current_session_tab_for_index}' vs List: '{name_in_list}'")
+
+    st.write("--- Value Comparison Debug End ---")
+    # --- 詳細なデバッグ情報表示ここまで ---
+
     active_tab_value_before_index_calc = st.session_state.get(SESSION_KEY_ACTIVE_TAB, "N/A (Not in session yet)")
     try:
         current_tab_index = tab_names.index(st.session_state[SESSION_KEY_ACTIVE_TAB])
@@ -152,12 +167,8 @@ if st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is not None:
         st.error(f"エラー(KeyError): セッションキー '{SESSION_KEY_ACTIVE_TAB}' が存在しません。デフォルトタブ ('{DEFAULT_ACTIVE_TAB}') に戻します。")
         current_tab_index = tab_names.index(DEFAULT_ACTIVE_TAB)
         st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB
-    # --- index 計算ここまで ---
 
-    # --- on_change コールバック関数の定義 ---
     def radio_selection_changed():
-        # このコールバックは st.radio の選択が変わり、セッションステートが更新された「後」に呼ばれる
-        # デバッグ用にセッションステートに一時的に値を保存し、後で表示する
         st.session_state.debug_radio_change_message = f"ラジオボタン選択変更検知: 新しいアクティブタブは '{st.session_state[SESSION_KEY_ACTIVE_TAB]}' です。"
 
     selected_tab_name_from_radio = st.radio(
@@ -166,20 +177,17 @@ if st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is not None:
         index=current_tab_index,
         key=SESSION_KEY_ACTIVE_TAB, 
         horizontal=True,
-        on_change=radio_selection_changed # on_changeコールバックを設定
+        on_change=radio_selection_changed
     )
 
-    # --- デバッグ情報表示 ---
-    st.write("--- タブ選択デバッグ情報 ---")
-    if 'debug_radio_change_message' in st.session_state: # on_changeでセットされたメッセージを表示
+    st.write("--- タブ選択デバッグ情報 (After radio) ---") # ラジオボタン描画後の状態を確認
+    if 'debug_radio_change_message' in st.session_state:
         st.write(st.session_state.debug_radio_change_message)
-        del st.session_state.debug_radio_change_message # 一度表示したら消す（または残しても良い）
-
+        # del st.session_state.debug_radio_change_message # すぐ消さずに残しておく
     st.write(f"st.radioから返された選択タブ (selected_tab_name_from_radio): `{selected_tab_name_from_radio}`")
     st.write(f"セッションステートの現在の選択タブ (st.session_state[SESSION_KEY_ACTIVE_TAB]): `{st.session_state.get(SESSION_KEY_ACTIVE_TAB)}`")
     st.write("--- デバッグ情報ここまで ---")
     
-    # --- 選択されたタブに応じて内容を表示 (条件分岐にはセッションステートの値を直接使用) ---
     active_tab_to_render = st.session_state[SESSION_KEY_ACTIVE_TAB] 
 
     if active_tab_to_render == TAB_NAME_REPORT:
@@ -208,17 +216,8 @@ if st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is not None:
         show_kwic_tab(morphemes_to_display)
     else:
         st.warning(f"不明なタブが選択されています: {active_tab_to_render}")
-
 else:
-    if not analyze_button: # analyze_button はこのスコープでは定義されていないため、より単純な条件にする
-        # st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is None で、かつ
-        # 何らかの操作（例えばサイドバーの変更）で再実行されたが、まだ分析ボタンは押されていない状態を想定
-        # analyze_button 変数は if analyze_button: ... else: のスコープ内なので、ここでは使えない。
-        # 代わりに、 st.session_state に analyze_button が押されたフラグを立てるか、
-        # あるいは単に「分析結果がなければ常にこのメッセージ」とする。
-        # ここでは後者（分析結果がなければ常にメッセージ）を採用。
-        st.info("分析したいテキストを入力し、「分析実行」ボタンを押してください。")
-
+    st.info("分析したいテキストを入力し、「分析実行」ボタンを押してください。")
 
 # --- フッター情報 ---
 st.sidebar.markdown("---")
