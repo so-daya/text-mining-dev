@@ -41,7 +41,7 @@ def show_sidebar_options():
     st.sidebar.markdown("---")
     st.sidebar.markdown("**共起ネットワーク詳細設定**")
     node_min_freq = st.sidebar.slider("ノード最低出現数:", 1, 20, 2, key="net_node_freq_slider_main")
-    edge_min_freq = st.sidebar.slider("エッジ最低共起数:", 1, 10, 2, key="net_edge_freq_slider_main")
+    edge_min_freq = st.sidebar.slider("エッジ最低共起数:", 1, 10, 1, key="net_edge_freq_slider_main")
 
     return {
         "report_pos": report_target_pos,
