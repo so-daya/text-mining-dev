@@ -2,8 +2,8 @@
 import streamlit as st
 import os
 
-# ページ設定は一番最初に呼び出す
-st.set_page_config(layout="wide", page_title="テキストマイニングツール (Streamlit版)")
+# ページ設定は一番最初に呼び出す (page_titleを修正)
+st.set_page_config(layout="wide", page_title="テキストマイニングツール")
 
 # --- モジュールのインポート ---
 from config import (APP_VERSION, SESSION_KEY_MECAB_INIT, TAGGER_OPTIONS,
@@ -97,7 +97,7 @@ if SESSION_KEY_ACTIVE_TAB not in st.session_state:
 
 
 # --- UI メイン部分 ---
-st.title("テキストマイニングツール (Streamlit版)")
+st.title("テキストマイニングツール")
 st.markdown("日本語テキストを入力して、形態素解析、単語レポート、ワードクラウド、共起ネットワーク、KWIC検索を実行します。")
 
 analysis_options = show_sidebar_options()
@@ -129,7 +129,6 @@ if analyze_button:
                 st.success(f"形態素解析が完了しました。総形態素数: {len(morphemes_result)}")
                 st.session_state[SESSION_KEY_ANALYZED_MORPHS] = morphemes_result
                 st.session_state[SESSION_KEY_ANALYZED_TEXT] = text_to_analyze
-                # 「分析実行」時はデフォルトタブに戻す
                 st.session_state[SESSION_KEY_ACTIVE_TAB] = DEFAULT_ACTIVE_TAB
 
 # --- 分析結果の表示エリア ---
@@ -147,24 +146,13 @@ if st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is not None:
     }
     tab_keys = list(tab_names_map.keys())
 
-    # --- ボタンベースのタブ選択 UI ---
     cols = st.columns(len(tab_keys))
     for i, tab_name_key in enumerate(tab_keys):
-        # ボタンのタイプを、現在アクティブなタブであれば "primary" に、そうでなければ "secondary" (デフォルト) にする
         button_type = "primary" if st.session_state.get(SESSION_KEY_ACTIVE_TAB) == tab_name_key else "secondary"
         if cols[i].button(tab_name_key, use_container_width=True, key=tab_names_map[tab_name_key], type=button_type):
             st.session_state[SESSION_KEY_ACTIVE_TAB] = tab_name_key
-            # ボタンクリックで即座に表示を更新するために st.rerun() を呼ぶ
-            # これにより、選択されたボタンがすぐにプライマリ表示になる
             st.rerun() 
 
-    # --- デバッグ情報表示 (簡略化) ---
-    # st.write("--- タブ選択デバッグ情報 (Button based) ---")
-    # active_in_session = st.session_state.get(SESSION_KEY_ACTIVE_TAB)
-    # st.write(f"現在のセッションステート (st.session_state['{SESSION_KEY_ACTIVE_TAB}']): `{active_in_session}`")
-    # st.write("--- デバッグ情報ここまで ---")
-    
-    # --- 選択されたタブに応じて内容を表示 ---
     active_tab_to_render = st.session_state.get(SESSION_KEY_ACTIVE_TAB, DEFAULT_ACTIVE_TAB) 
 
     if active_tab_to_render == TAB_NAME_REPORT:
@@ -187,11 +175,9 @@ if st.session_state.get(SESSION_KEY_ANALYZED_MORPHS) is not None:
                          analysis_options["edge_min_freq"])
     elif active_tab_to_render == TAB_NAME_KWIC:
         show_kwic_tab(morphemes_to_display)
-    # else ブロックは、DEFAULT_ACTIVE_TAB が必ず tab_names に含まれるため、通常不要
-
 else:
     st.info("分析したいテキストを入力し、「分析実行」ボタンを押してください。")
 
 # --- フッター情報 ---
 st.sidebar.markdown("---")
-st.sidebar.info(f"テキストマイニングツール (Streamlit版) v{APP_VERSION}")
+st.sidebar.info(f"テキストマイニングツール v{APP_VERSION}") # ★「(Streamlit版)」を削除
