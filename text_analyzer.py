@@ -1,4 +1,4 @@
-# text_analyzer.py
+# text_analyzer.py (全体を置き換えてください)
 import MeCab
 import pandas as pd
 from collections import Counter
@@ -12,7 +12,7 @@ import os
 import numpy as np
 from itertools import combinations
 import streamlit as st
-import html # ★XSS対策のためhtmlモジュールをインポート
+import html
 
 from config import TAGGER_OPTIONS, FONT_PATH_PRIMARY, PYVIS_OPTIONS_STR
 
@@ -22,7 +22,6 @@ def initialize_mecab_tagger():
     try:
         tagger_obj = MeCab.Tagger(TAGGER_OPTIONS)
         tagger_obj.parse('') 
-        # print("MeCab Tagger initialized successfully via cache.") # ★情報漏洩対策: コメントアウト
         return tagger_obj
     except Exception as e_init:
         st.error(f"MeCab Taggerの初期化に失敗しました: {e_init}")
@@ -37,11 +36,9 @@ def setup_japanese_font():
     """
     font_path_final = None
     font_name_final = None
-    
     if os.path.exists(FONT_PATH_PRIMARY):
         font_path_final = FONT_PATH_PRIMARY
         font_name_final = os.path.splitext(os.path.basename(font_path_final))[0]
-        # print(f"プライマリ日本語フォント '{font_name_final}' を使用します。") # ★情報漏洩対策: コメントアウト
     else:
         st.sidebar.error(f"指定されたプライマリフォント '{FONT_PATH_PRIMARY}' が見つかりません。代替フォントを検索します。")
         try:
@@ -67,7 +64,6 @@ def setup_japanese_font():
             if font_name_final not in [f.name for f in fm.fontManager.ttflist]:
                  fm.fontManager.ttflist.append(font_entry)
             plt.rcParams['font.family'] = font_name_final
-            # print(f"Matplotlibのデフォルトフォントとして '{font_name_final}' を設定しました。") # ★情報漏洩対策: コメントアウト
             return font_path_final, font_name_final
         except Exception as e_font_setting:
             st.sidebar.error(f"Matplotlibへの日本語フォント設定中にエラーが発生しました: {e_font_setting}")
@@ -79,7 +75,6 @@ def perform_morphological_analysis(text_input, _tagger_config_identifier=None):
     tagger_instance = initialize_mecab_tagger()
     if tagger_instance is None or not text_input.strip():
         return []
-    
     all_morphemes = []
     node = tagger_instance.parseToNode(text_input)
     while node:
@@ -102,7 +97,6 @@ def filter_morphemes(all_morphemes, target_pos_list, stop_words_set,
     """指定された条件で形態素リストをフィルタリングする。"""
     if noun_subtype_exclusions is None:
         noun_subtype_exclusions = ['非自立', '数', '代名詞', '接尾', 'サ変接続', '副詞可能']
-        
     filtered_morphemes = []
     for m in all_morphemes:
         if m['品詞'] in target_pos_list and m['原形'].lower() not in stop_words_set:
@@ -113,34 +107,32 @@ def filter_morphemes(all_morphemes, target_pos_list, stop_words_set,
             filtered_morphemes.append(m)
     return filtered_morphemes
 
-# @st.cache_data
-def generate_word_report(_all_morphemes_tuple, target_pos_list_tuple, stop_words_set_tuple):
+@st.cache_data # ★キャッシュを再度有効化
+def generate_word_report(text_input_raw_for_cache_key, # ★引数追加: 生テキスト
+                         _all_morphemes_tuple, 
+                         target_pos_list_tuple, 
+                         stop_words_set_tuple):
     """形態素リストから単語出現レポートのDataFrameを生成する。"""
+    # text_input_raw_for_cache_key はキャッシュキーとして使用
     all_morphemes = list(_all_morphemes_tuple)
     target_pos_list = list(target_pos_list_tuple)
     stop_words_set = set(stop_words_set_tuple)
 
     if not all_morphemes:
         return pd.DataFrame(), 0, 0
-
     report_target_morphemes = filter_morphemes(
         all_morphemes, target_pos_list, stop_words_set,
-        noun_subtype_exclusions=['非自立', '数', '代名詞', '接尾'] # サ変接続, 副詞可能 を除外しない
+        noun_subtype_exclusions=['非自立', '数', '代名詞', '接尾']
     )
-
     if not report_target_morphemes:
         return pd.DataFrame(), len(all_morphemes), 0
-            
     word_counts = Counter(m['原形'] for m in report_target_morphemes)
     report_data = []
-    
     representative_pos_info = {}
     for m in reversed(report_target_morphemes): 
         if m['原形'] not in representative_pos_info:
             representative_pos_info[m['原形']] = m['品詞']
-            
     total_morphemes_count = len(all_morphemes)
-
     for rank, (word, count) in enumerate(word_counts.most_common(), 1):
         pos = representative_pos_info.get(word, '') 
         frequency = (count / total_morphemes_count) * 100 if total_morphemes_count > 0 else 0
@@ -150,9 +142,14 @@ def generate_word_report(_all_morphemes_tuple, target_pos_list_tuple, stop_words
         })
     return pd.DataFrame(report_data), total_morphemes_count, sum(word_counts.values())
 
-# @st.cache_data
-def generate_wordcloud_image(_morphemes_data_tuple, font_path_wc, target_pos_list_tuple, stop_words_set_tuple):
+@st.cache_data # ★キャッシュを再度有効化
+def generate_wordcloud_image(text_input_raw_for_cache_key, # ★引数追加: 生テキスト
+                             _morphemes_data_tuple, 
+                             font_path_wc, 
+                             target_pos_list_tuple, 
+                             stop_words_set_tuple):
     """形態素リストからワードクラウド画像を生成する。"""
+    # text_input_raw_for_cache_key はキャッシュキーとして使用
     all_morphemes = list(_morphemes_data_tuple)
     target_pos_list = list(target_pos_list_tuple)
     stop_words_set = set(stop_words_set_tuple)
@@ -163,18 +160,15 @@ def generate_wordcloud_image(_morphemes_data_tuple, font_path_wc, target_pos_lis
     if font_path_wc is None or not os.path.exists(font_path_wc): 
         st.error(f"ワードクラウド生成に必要なフォントパス '{font_path_wc}' が見つかりません。")
         return None
-
     wordcloud_source_morphemes = filter_morphemes(
         all_morphemes, target_pos_list, stop_words_set,
         noun_subtype_exclusions=['数', '非自立', '代名詞', '接尾']
     )
     wordcloud_words = [m['原形'] for m in wordcloud_source_morphemes]
     wordcloud_text_input_str = " ".join(wordcloud_words)
-
     if not wordcloud_text_input_str.strip(): 
         st.info("ワードクラウド表示対象の単語が見つかりませんでした（フィルタリング後）。")
         return None
-    
     try:
         wc = WordCloud(font_path=font_path_wc, background_color="white", 
                        width=800, height=400, max_words=200, 
@@ -205,7 +199,6 @@ def generate_cooccurrence_network_html(_morphemes_data_tuple, text_input_co, _ta
     if font_path_co is None or not os.path.exists(font_path_co) or font_name_co is None:
         st.error(f"共起ネットワークのラベル表示に必要な日本語フォント '{font_path_co}' が見つからないか、フォント名が未設定です。")
         return None
-
     node_candidate_morphemes = filter_morphemes(
         all_morphemes, target_pos_list, stop_words_set,
         noun_subtype_exclusions=['非自立', '数', '代名詞', '接尾', 'サ変接続', '副詞可能'],
@@ -214,14 +207,11 @@ def generate_cooccurrence_network_html(_morphemes_data_tuple, text_input_co, _ta
     temp_words_for_nodes = [m['原形'] for m in node_candidate_morphemes]
     word_counts = Counter(temp_words_for_nodes)
     node_candidates_dict = {word: count for word, count in word_counts.items() if count >= node_min_freq}
-
     if len(node_candidates_dict) < 2:
         st.info(f"共起ネットワークのノードとなる単語（フィルタ後、出現数{node_min_freq}以上）が2つ未満です。")
         return None
-
     sentences = re.split(r'[。\n！？]+', text_input_co)
     sentences = [s.strip() for s in sentences if s.strip()]
-    
     cooccurrence_counts_map = Counter()
     for sentence in sentences:
         node_s = tagger_instance.parseToNode(sentence)
@@ -235,60 +225,39 @@ def generate_cooccurrence_network_html(_morphemes_data_tuple, text_input_co, _ta
             node_s = node_s.next
         for pair in combinations(sorted(list(set(words_in_sentence))), 2):
             cooccurrence_counts_map[pair] += 1
-    
     if not cooccurrence_counts_map:
         st.info("共起ペアが見つかりませんでした。")
         return None
-
     pyvis_font_face = font_name_co
     if font_name_co:
       if 'gothic' in font_name_co.lower() or 'ipagp' in font_name_co.lower():
           pyvis_font_face = 'IPAexGothic, IPAPGothic, Gothic, sans-serif'
       elif 'mincho' in font_name_co.lower() or 'ipamp' in font_name_co.lower():
           pyvis_font_face = 'IPAexMincho, IPAPMincho, Mincho, serif'
-
     net_graph = Network(notebook=True, height="750px", width="100%", directed=False, 
                         bgcolor="#F5F5F5", font_color="#333333")
-    
     for word, count in node_candidates_dict.items():
         node_size = int(np.sqrt(count) * 10 + 10)
-        
-        # --- ★XSS対策: html.escape() を適用 ---
         escaped_word = html.escape(word) 
         node_label_with_count = f"{escaped_word}\n({count})" 
         node_title = f"{escaped_word} (出現数: {count})"
-        # --- ★修正ここまで ---
-
         net_graph.add_node(
-            word, # ノードIDは元の単語のまま
-            label=node_label_with_count, 
-            size=node_size, 
+            word, label=node_label_with_count, size=node_size, 
             title=node_title, 
             font={'face': pyvis_font_face, 'size': 12, 'color': '#333333'}, 
             borderWidth=1, color={'border': '#666666', 'background': '#D2E5FF'}
         )
-    
     added_edge_count = 0
     for pair_nodes, freq_cooc in cooccurrence_counts_map.items():
         if freq_cooc >= edge_min_freq:
             edge_width = float(np.log1p(freq_cooc) * 1.5 + 0.5)
-            # エッジのタイトルも念のためエスケープ (もし単語ペアをタイトルに含める場合)
-            # current_edge_title = f"共起回数: {freq_cooc}" # このままならエスケープ不要
             net_graph.add_edge(pair_nodes[0], pair_nodes[1], value=edge_width, 
                                title=f"共起回数: {freq_cooc}", 
                                color={'color': '#cccccc', 'highlight': '#848484', 'opacity':0.6})
             added_edge_count +=1
-            
     if added_edge_count == 0:
         st.info(f"表示対象の共起ペア（共起回数 {edge_min_freq} 回以上）がありませんでした。")
         return None
-        
-    # Pyvisオプション設定 (AttributeError回避のためコメントアウト中)
-    # try:
-    #     net_graph.set_options(PYVIS_OPTIONS_STR)
-    # except Exception as e_set_opt: 
-    #     st.warning(f"Pyvisオプション設定で軽微なエラー: {e_set_opt} (描画は継続します)")
-
     net_graph.show_buttons(filter_=False) 
     return net_graph.generate_html(name="temp_cooc_net_streamlit.html", notebook=True)
 
@@ -298,22 +267,16 @@ def perform_kwic_search(_morphemes_data_tuple, keyword_str, search_key_type_str,
     all_morphemes = list(_morphemes_data_tuple)
     if not keyword_str.strip() or not all_morphemes:
         return []
-    
     kwic_results_data = []
     keyword_to_compare = keyword_str.strip().lower()
-
     for i, morpheme_item in enumerate(all_morphemes):
         target_text_in_morpheme = morpheme_item[search_key_type_str].lower()
-        
         if target_text_in_morpheme == keyword_to_compare:
             left_start_idx = max(0, i - window_int)
             left_context_str = "".join(m['表層形'] for m in all_morphemes[left_start_idx:i])
-            
             keyword_surface_form = morpheme_item['表層形']
-            
             right_end_idx = min(len(all_morphemes), i + 1 + window_int)
             right_context_str = "".join(m['表層形'] for m in all_morphemes[i+1:right_end_idx])
-            
             kwic_results_data.append({
                 '左文脈': left_context_str, 'キーワード': keyword_surface_form, '右文脈': right_context_str
             })
