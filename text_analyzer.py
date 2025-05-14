@@ -109,7 +109,7 @@ def filter_morphemes(all_morphemes, target_pos_list, stop_words_set,
                      noun_subtype_exclusions=None, min_len_non_noun=0):
     """指定された条件で形態素リストをフィルタリングする。"""
     if noun_subtype_exclusions is None:
-        noun_subtype_exclusions = ['非自立', '数', '代名詞', '接尾', 'サ変接続', '副詞可能']
+        noun_subtype_exclusions=['非自立', '数', '代名詞', '接尾'] # 'サ変接続', '副詞可能' をリストから削除
         
     filtered_morphemes = []
     for m in all_morphemes:
